@@ -1,13 +1,11 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// Initialize the Google Generative AI with API key
-const apiKey = process.env.GOOGLE_GEMINI_KEY;
-if (!apiKey) {
-    console.error("ERROR: GOOGLE_GEMINI_KEY environment variable is not set");
-    process.exit(1);
+if (!process.env.GOOGLE_GEMINI_KEY) {
+  console.error('ERROR: GOOGLE_GEMINI_KEY environment variable is not set');
+  process.exit(1);
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY);
 
 // Configure the model with system instruction for concise reviews
 const model = genAI.getGenerativeModel({
@@ -79,4 +77,4 @@ Keep explanations brief and direct. Use bullet points. Total response should be 
     }
 }
 
-module.exports = generateContent    
+module.exports = generateContent

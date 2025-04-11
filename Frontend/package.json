@@ -1,13 +1,13 @@
 {
-  "name": "frontend",
+  "name": "code-review-frontend",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "build": "vite build",
-    "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "vite --host 0.0.0.0"
   },
   "dependencies": {
     "@codemirror/lang-javascript": "^6.2.3",
