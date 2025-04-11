@@ -1,14 +1,13 @@
 require('dotenv').config()
 const app = require('./src/app')
 
-// Explicitly use port 3001 to avoid any confusion
-const PORT = 3001
+const PORT = process.env.PORT || 3000
 
 console.log('Starting server on port ' + PORT + '...')
 
-// Add error handling
-const server = app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`)
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server is running on port ${PORT}`)
+    console.log(`Environment: ${process.env.NODE_ENV}`)
 })
 
 server.on('error', (error) => {

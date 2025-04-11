@@ -1,0 +1,67 @@
+name: code-review-app
+
+services:
+  mongodb:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - app-network
+    healthcheck:
+      test: mongosh --eval "db.adminCommand('ping')"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build: 
+      context: ./BackEnd
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env.development
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017/code-reviewer
+      - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000
+    networks:
+      app-network:
+        aliases:
+          - backend
+    volumes:
+      - ./BackEnd:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      mongodb:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    env_file:
+      - .env.development
+    environment:
+      - VITE_API_URL=http://localhost:3000/api
+    networks:
+      app-network:
+        aliases:
+          - frontend
+    volumes:
+      - ./Frontend:/usr/src/app
+      - /usr/src/app/node_modules
+    depends_on:
+      backend:
+        condition: service_started
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:

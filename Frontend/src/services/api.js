@@ -1,10 +1,11 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001/api';
-
-// Create axios instance with base URL
 const api = axios.create({
-  baseURL: API_URL
+  baseURL: '/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 5000,
 });
 
 // Add auth token to requests
@@ -17,6 +18,20 @@ api.interceptors.request.use(
     return config;
   },
   (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Add response interceptor for error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', {
+      message: error.message,
+      url: error.config?.url,
+      method: error.config?.method,
+      baseURL: error.config?.baseURL
+    });
     return Promise.reject(error);
   }
 );
@@ -39,4 +54,4 @@ export const aiService = {
   getCodeReview: (code, reviewStyle = 'concise') => api.post('/ai/get-review', { code, reviewStyle })
 };
 
-export default api; 
+export default api;

@@ -10,12 +10,23 @@ connectDB();
 
 const app = express();
 
-// More specific CORS configuration
+// CORS configuration using environment variables
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,http://frontend:5173').split(',');
+
 const corsOptions = {
-  origin: ['http://localhost:5177', 'http://localhost:5178', 'http://localhost:5179', 'http://localhost:3000', 'http://localhost:5173'],
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn('Blocked by CORS:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 };
 
 // Middleware
