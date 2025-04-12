@@ -1,20 +1,14 @@
-FROM node:20-slim
+# Build stage
+FROM node:20-slim AS builder
 
-WORKDIR /usr/src/app
-
-# Install system dependencies
-RUN apt-get update && \
-    apt-get install -y wget && \
-    rm -rf /var/lib/apt/lists/*
-
-# Copy package files and install dependencies
+WORKDIR /app
 COPY package*.json ./
 RUN npm install
-
-# Copy source code
 COPY . .
+RUN npm run build
 
-EXPOSE 5173
-
-# Start development server
-CMD ["npm", "run", "dev"]
+# Serve stage
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
