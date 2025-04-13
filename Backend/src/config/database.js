@@ -13,16 +13,6 @@ async function connectDB() {
     await mongoose.connect(process.env.MONGODB_URI, mongooseOptions);
     console.log('MongoDB connected successfully');
     
-    // Run migrations
-    const { db, client } = await database.connect();
-    const migrated = await database.up(db, client);
-    
-    if (migrated.length > 0) {
-      console.log('Ran migrations:', migrated);
-    } else {
-      console.log('No migrations pending');
-    }
-
     mongoose.connection.on('error', err => {
       console.error('MongoDB connection error:', err);
     });

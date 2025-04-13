@@ -7,6 +7,7 @@ import "highlight.js/styles/github-dark.css";
 import { aiService, reviewService } from '../services/api';
 import { AuthContext } from '../context/AuthContext';
 import { Link } from 'react-router-dom';
+import '../styles/CodeReview.css';
 
 const CodeReview = () => {
   const [code, setCode] = useState(`function sum(a, b) {
@@ -21,6 +22,7 @@ console.log(result);`);
   const [error, setError] = useState(null);
   const [language, setLanguage] = useState('javascript');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
   
   const { isAuthenticated } = useContext(AuthContext);
 
@@ -37,39 +39,97 @@ console.log(result);`);
       setIsLoading(true);
       setError(null);
       setSaveSuccess(false);
+      setIsRetrying(false);
       
-      const response = await aiService.getCodeReview(code, 'concise');
-      setReview(response.data);
+      const response = await aiService.getCodeReview(code, {
+        language,
+        reviewStyle: 'detailed'  // Use consistent review style
+      });
+      
+      setReview(response.review);
       
       // Automatically save review if user is authenticated
-      if (isAuthenticated && response.data) {
-        await saveReview(response.data);
+      if (isAuthenticated && response.review) {
+        await saveReviewToHistory(response.review);
       }
     } catch (err) {
-      setError('Failed to get code review. Please try again.');
-      console.error('Error:', err);
+      console.error('Error fetching review details:', err);
+      
+      // Special handling for timeout errors
+      if (err.isTimeout) {
+        setError(
+          'The code review is taking longer than expected. You can retry or try with a smaller code sample.'
+        );
+        setIsRetrying(true);
+      } else {
+        setError(`Failed to get code review: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setIsLoading(false);
     }
   }
   
-  async function saveReview(aiReview) {
+  // Add function to retry with increased timeout
+  async function retryReview() {
     try {
-      await reviewService.saveReview({
-        codeSubmitted: code,
-        language: language,
-        aiReview: aiReview
+      setIsLoading(true);
+      setError('Retrying with extended timeout...');
+      setIsRetrying(false);
+      
+      const response = await aiService.getCodeReview(code, {
+        language,
+        reviewStyle: 'concise' // Use concise style for retries to speed up response
       });
+      
+      setReview(response.review);
+      setError(null);
+      
+    } catch (err) {
+      setError(`Review failed after retry: ${err.message || 'Unknown error'}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  // Update the review saving function
+  async function saveReviewToHistory(aiReview) {
+    try {
+      console.log('Saving review to history with:', {
+        codeLength: code.length,
+        reviewLength: aiReview.length,
+        language
+      });
+      
+      // Force trim values to ensure they are valid
+      const payload = {
+        code: String(code).trim(),
+        review: String(aiReview).trim(),
+        language: String(language).trim()
+      };
+      
+      console.log('Sending review payload');
+      
+      // Add timeout to improve reliability
+      const response = await reviewService.createReview(payload);
+      console.log('Review saved successfully:', response?.data?._id || 'OK');
+      
       setSaveSuccess(true);
     } catch (err) {
       console.error('Error saving review:', err);
-      // Don't show error to user as this is a background save
+      
+      // Don't show save errors to user for better experience
+      // but log them for debugging
+      console.warn('Save error details:', 
+        err.response?.data || err.message || 'Unknown error');
+      
+      // Silent failure - don't disturb user experience
+      setSaveSuccess(false);
     }
   }
 
   return (
     <div className="app-container">
-      {/* Sidebar */}
+      {/* Sidebar with enhanced icons */}
       <div className="sidebar">
         <div className="sidebar-header">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -105,6 +165,14 @@ console.log(result);`);
                 </svg>
                 <span>History</span>
               </Link>
+              
+              <Link to="/profile" className="sidebar-item">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <span>Profile</span>
+              </Link>
             </>
           )}
         </div>
@@ -117,7 +185,7 @@ console.log(result);`);
         )}
       </div>
       
-      {/* Main content */}
+      {/* Main content with adjusted spacing */}
       <div className="main-content">
         <main>
           <div className="left">
@@ -149,7 +217,7 @@ console.log(result);`);
                 onChange={handleChange}
                 basicSetup={{
                   lineNumbers: true,
-                  foldGutter: false,
+                  foldGutter: true,
                   dropCursor: true,
                   allowMultipleSelections: true,
                   indentOnInput: true,
@@ -166,13 +234,36 @@ console.log(result);`);
             </button>
             
             {saveSuccess && isAuthenticated && (
-              <div className="save-success">Review saved to your history!</div>
+              <div className="save-success">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
+                <span>Review saved to your history!</span>
+              </div>
             )}
           </div>
           
           <div className="right">
             <h2 className="section-title">AI Review</h2>
-            {error && <div className="error-message">{error}</div>}
+            {error && (
+              <div className="error-message">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>{error}</span>
+                {isRetrying && (
+                  <button 
+                    onClick={retryReview} 
+                    className="retry-button"
+                  >
+                    Retry with concise review
+                  </button>
+                )}
+              </div>
+            )}
             {isLoading && <div className="loading-indicator">
               <div className="spinner"></div>
               <p>Getting AI review...</p>
@@ -199,4 +290,4 @@ console.log(result);`);
   );
 };
 
-export default CodeReview; 
+export default CodeReview;

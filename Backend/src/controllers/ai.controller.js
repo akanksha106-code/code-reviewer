@@ -1,67 +1,100 @@
-const aiService = require("../services/ai.service")
+const mockAIService = require('../services/mock-ai.service');
+const GeminiApiService = require('../services/gemini-api.service');
+
+// Initialize API service with key from environment
+const apiKey = process.env.GOOGLE_GEMINI_KEY;
+const geminiService = apiKey ? new GeminiApiService(apiKey) : null;
+
+// Flag to control which service to use
+const USE_MOCK = process.env.USE_MOCK_AI === 'true';
+
+// Test the API on startup
+(async () => {
+  if (geminiService) {
+    const test = await geminiService.testConnection();
+    console.log(test.success 
+      ? `🎉 Gemini API connected successfully using model: ${test.model}`
+      : `⚠️ Gemini API connection failed: ${test.error}`
+    );
+  } else {
+    console.log('⚠️ No API key found, using mock service only');
+  }
+})();
 
 /**
- * Controller to handle code review requests
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
+ * Controller for generating code reviews
  */
-module.exports.getReview = async (req, res) => {
-    const { code, reviewStyle = 'concise' } = req.body;
+const getReview = async (req, res) => {
+  const { 
+    code, 
+    language = 'javascript',
+    reviewStyle = 'detailed' 
+  } = req.body;
 
-    // Validate request
-    if (!code) {
-        console.warn('Review request received with missing code');
-        return res.status(400).json({ 
-            success: false, 
-            message: "Code is required for review" 
-        });
-    }
+  // Set a timeout for the request
+  const requestTimeout = setTimeout(() => {
+    console.log('AI review request timed out internally');
+    // Note: We don't send a response here as the request might still be processing
+  }, 25000); // 25 seconds internal timeout warning
 
-    try {
-        console.log(`Processing code review request (style: ${reviewStyle})`);
-        
-        // Get review from AI service
-        const response = await aiService(code, reviewStyle);
-        
-        console.log('Review generated successfully');
-        res.json(response);
-        
-    } catch (error) {
-        console.error('Error generating code review:', error);
-        
-        res.status(500).json({ 
-            success: false, 
-            message: "Failed to generate code review", 
-            error: error.message || "Unknown error occurred" 
-        });
+  if (!code) {
+    clearTimeout(requestTimeout);
+    return res.status(400).json({
+      success: false,
+      message: "Code is required for review"
+    });
+  }
+
+  try {
+    console.log(`Processing code review request for ${language} code (${reviewStyle} style)`);
+    
+    // Decide which service to use
+    let result;
+    
+    // Check code length and adjust review style for large inputs
+    const codeLength = code.length;
+    let actualReviewStyle = reviewStyle;
+    
+    // For large code samples, default to concise to avoid timeouts
+    if (codeLength > 5000 && reviewStyle === 'detailed') {
+      console.log('Large code sample detected, using concise review style');
+      actualReviewStyle = 'concise';
     }
+    
+    console.log(`Processing ${actualReviewStyle} review for ${language} code (${codeLength} chars)`);
+    
+    if (USE_MOCK || !geminiService) {
+      console.log('Using mock AI service');
+      result = await mockAIService.generateReview(code, language, actualReviewStyle);
+    } else {
+      console.log('Using Gemini API service');
+      try {
+        result = await geminiService.generateReview(code, language, actualReviewStyle);
+      } catch (apiError) {
+        console.error('Gemini API failed, falling back to mock:', apiError.message);
+        result = await mockAIService.generateReview(code, language, actualReviewStyle);
+        result.metadata.fallback = true;
+      }
+    }
+    
+    clearTimeout(requestTimeout);
+    return res.json(result);
+  } catch (error) {
+    clearTimeout(requestTimeout);
+    console.error('AI Review Error:', error);
+    
+    // Customize error message based on error type
+    let errorMessage = "Failed to generate code review";
+    if (error.message?.includes('timeout')) {
+      errorMessage = "The review process took too long. Try with a smaller code sample or choose 'concise' review style.";
+    }
+    
+    return res.status(500).json({
+      success: false,
+      message: errorMessage,
+      error: error.message
+    });
+  }
 };
 
-/**
- * Controller to handle default code review requests via GET method
- * @param {Object} req - Express request object
- * @param {Object} res - Express response object
- */
-module.exports.getDefaultReview = async (req, res) => {
-    try {
-        console.log('Processing default code review request');
-        
-        // You could return sample reviews, documentation, or handle query params
-        res.json({
-            success: true,
-            message: "Use POST method with code in request body for a full review",
-            examples: [
-                { endpoint: "/api/ai/get-review", method: "POST", body: { code: "function example() {}", reviewStyle: "concise" } }
-            ]
-        });
-        
-    } catch (error) {
-        console.error('Error in default review handler:', error);
-        
-        res.status(500).json({ 
-            success: false, 
-            message: "Failed to process request", 
-            error: error.message || "Unknown error occurred" 
-        });
-    }
-};
+module.exports = { getReview };

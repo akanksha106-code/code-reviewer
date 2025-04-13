@@ -1,83 +1,70 @@
-import { useContext, useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { Link } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
 import { reviewService } from '../services/api';
+import { AuthContext } from '../context/AuthContext';
+import '../styles/Dashboard.css';
 
 const Dashboard = () => {
-  const { user } = useContext(AuthContext);
-  const [reviews, setReviews] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [stats, setStats] = useState({
-    reviewCount: 0,
-    languagesUsed: 0,
-    daysActive: 0
+    totalReviews: 0,
+    languages: [],
+    recentReviews: []
   });
+  const [loading, setLoading] = useState(true);
+  const { user } = useContext(AuthContext);
 
   useEffect(() => {
-    console.log("Dashboard mounted, user:", user);
-    if (user && user.token) {
-      console.log("User has token, fetching reviews...");
-      fetchReviews();
-    } else {
-      console.error("No user token available!");
-      setLoading(false);
-      setError('You need to be logged in to view dashboard data');
-    }
-  }, [user]);
+    fetchDashboardData();
+  }, []);
 
-  const fetchReviews = async () => {
+  const fetchDashboardData = async () => {
     try {
-      console.log("Fetching reviews from API...");
       setLoading(true);
       const response = await reviewService.getReviews();
-      console.log("Reviews data received:", response.data);
-      setReviews(response.data);
+      const reviews = response.data || [];
       
-      // Calculate stats from reviews
-      calculateStats(response.data);
+      // Calculate stats
+      const languageCounts = {};
+      reviews.forEach(review => {
+        const lang = review.language || 'unknown';
+        languageCounts[lang] = (languageCounts[lang] || 0) + 1;
+      });
       
-      setError(null);
-    } catch (err) {
-      console.error('Error fetching reviews details:', err);
-      if (err.response) {
-        console.error('Status:', err.response.status);
-        console.error('Data:', err.response.data);
-      }
-      setError('Failed to load your dashboard data. ' + (err.message || ''));
+      // Sort by date for recent reviews
+      const sortedReviews = [...reviews].sort((a, b) => {
+        return new Date(b.createdAt) - new Date(a.createdAt);
+      });
+      
+      setStats({
+        totalReviews: reviews.length,
+        languages: Object.entries(languageCounts).map(([language, count]) => ({ 
+          language, 
+          count,
+          percentage: Math.round(count / reviews.length * 100)
+        })),
+        recentReviews: sortedReviews.slice(0, 5)
+      });
+      
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
     }
   };
-
-  const calculateStats = (reviewData) => {
-    if (!reviewData || reviewData.length === 0) {
-      console.log("No review data to calculate stats from");
-      return;
+  
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch (e) {
+      return 'Invalid date';
     }
-
-    console.log("Calculating stats from review data");
-    // Count total reviews
-    const reviewCount = reviewData.length;
-    
-    // Count unique languages
-    const uniqueLanguages = new Set(reviewData.map(review => review.language));
-    const languagesUsed = uniqueLanguages.size;
-    
-    // Calculate days active (from first review to now)
-    const firstReviewDate = new Date(
-      Math.min(...reviewData.map(review => new Date(review.createdAt)))
-    );
-    const today = new Date();
-    const diffTime = Math.abs(today - firstReviewDate);
-    const daysActive = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    console.log("Stats calculated:", { reviewCount, languagesUsed, daysActive });
-    setStats({
-      reviewCount,
-      languagesUsed,
-      daysActive
-    });
   };
 
   return (
@@ -116,61 +103,102 @@ const Dashboard = () => {
             </svg>
             <span>History</span>
           </Link>
+          
+          <Link to="/profile" className="sidebar-item">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            <span>Profile</span>
+          </Link>
         </div>
       </div>
       
       {/* Main content */}
       <div className="main-content">
         <div className="dashboard-container">
-          <h2>Welcome to Your Dashboard, {user ? user.username : 'User'}!</h2>
+          <h1>Dashboard</h1>
+          <p className="dashboard-greeting">Welcome back, {user?.username || 'User'}!</p>
           
-          {error && <div className="error-message">{error}</div>}
-          
-          <div className="dashboard-cards">
-            <div className="dashboard-card">
-              <h3>Review Code</h3>
-              <p>Get AI-powered feedback on your code's quality and best practices.</p>
-              <Link to="/" className="dashboard-button">Start a New Review</Link>
-            </div>
-            
-            <div className="dashboard-card">
-              <h3>Review History</h3>
-              <p>Access your past code reviews and feedback history.</p>
-              <Link to="/history" className="dashboard-button">View History</Link>
-            </div>
-            
-            <div className="dashboard-card">
-              <h3>Profile Settings</h3>
-              <p>Update your account information and preferences.</p>
-              <Link to="/profile" className="dashboard-button">Manage Profile</Link>
-            </div>
-          </div>
-          
-          <div className="dashboard-stats">
-            <h3>Your Stats</h3>
-            {loading ? (
-              <div className="loading-state">Loading your stats...</div>
-            ) : (
-              <div className="stats-grid">
-                <div className="stat-item">
-                  <span className="stat-value">{stats.reviewCount}</span>
-                  <span className="stat-label">Code Reviews</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-value">{stats.languagesUsed}</span>
-                  <span className="stat-label">Languages Used</span>
-                </div>
-                <div className="stat-item">
-                  <span className="stat-value">{stats.daysActive}</span>
-                  <span className="stat-label">Days Active</span>
+          {loading ? (
+            <div className="loading-container">Loading your dashboard...</div>
+          ) : (
+            <div className="dashboard-content">
+              {/* Overview Stats */}
+              <div className="dashboard-section overview-stats">
+                <h2>Overview</h2>
+                <div className="stats-grid">
+                  <div className="stat-box">
+                    <div className="stat-icon reviews-icon">📊</div>
+                    <div className="stat-details">
+                      <h3>{stats.totalReviews}</h3>
+                      <p>Total Reviews</p>
+                    </div>
+                  </div>
+                  
+                  <div className="stat-box">
+                    <div className="stat-icon languages-icon">🔤</div>
+                    <div className="stat-details">
+                      <h3>{stats.languages.length}</h3>
+                      <p>Languages</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
+              
+              {/* Language Distribution */}
+              <div className="dashboard-section language-distribution">
+                <h2>Language Distribution</h2>
+                {stats.languages.length > 0 ? (
+                  <div className="languages-list">
+                    {stats.languages.map(lang => (
+                      <div className="language-item" key={lang.language}>
+                        <div className="language-name">
+                          {lang.language.charAt(0).toUpperCase() + lang.language.slice(1)}
+                        </div>
+                        <div className="language-bar-container">
+                          <div 
+                            className="language-bar" 
+                            style={{width: `${lang.percentage}%`}}
+                          ></div>
+                        </div>
+                        <div className="language-count">{lang.count}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="no-data">No language data available yet</p>
+                )}
+              </div>
+              
+              {/* Recent Reviews */}
+              <div className="dashboard-section recent-reviews">
+                <h2>Recent Reviews</h2>
+                {stats.recentReviews.length > 0 ? (
+                  <div className="reviews-list">
+                    {stats.recentReviews.map(review => (
+                      <Link to={`/history?id=${review._id}`} className="review-item" key={review._id}>
+                        <div className="review-language">{review.language}</div>
+                        <div className="review-date">{formatDate(review.createdAt)}</div>
+                        <div className="review-preview">
+                          {review.code.substring(0, 60)}...
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="no-reviews">
+                    <p>You don't have any reviews yet.</p>
+                    <Link to="/" className="create-review-btn">Create Your First Review</Link>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default Dashboard; 
+export default Dashboard;

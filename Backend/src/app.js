@@ -6,7 +6,7 @@ validateEnv();
 
 const express = require('express');
 const cors = require('cors');
-const connectDB = require('./config/db');
+const connectDB = require('./config/database'); // Updated path
 const aiRoutes = require('./routes/ai.routes');
 const authRoutes = require('./routes/auth.routes');
 const reviewRoutes = require('./routes/review.routes');
@@ -16,17 +16,25 @@ connectDB();
 
 const app = express();
 
-// Middleware
+// CORS configuration
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:5173'
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
 
-// Add connection validation middleware
+// Add headers middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
   next();
 });
+
+// Middleware
+app.use(express.json());
 
 // API health check endpoint
 app.get('/api/health', (req, res) => {
@@ -43,9 +51,9 @@ app.get('/test', (req, res) => {
     res.json({ message: 'Test endpoint is working' });
 });
 
-// Routes
-app.use('/api/reviews', reviewRoutes);
+// API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/reviews', reviewRoutes);
 app.use('/api/ai', aiRoutes);
 
 // Error handling middleware

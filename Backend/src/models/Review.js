@@ -1,53 +1,41 @@
 const mongoose = require('mongoose');
+const Schema = mongoose.Schema;
 
-const reviewSchema = new mongoose.Schema({
+const ReviewSchema = new Schema({
+  user: {
+    type: Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
   code: {
     type: String,
-    required: true,
-    trim: true,
-    validate: {
-      validator: function(v) {
-        return v && v.length > 0;
-      },
-      message: 'Code cannot be empty'
-    }
+    required: true
   },
   review: {
     type: String,
-    required: true,
-    trim: true,
-    validate: {
-      validator: function(v) {
-        return v && v.length > 0;
-      },
-      message: 'Review cannot be empty'
-    }
+    required: true
   },
-  author: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    validate: {
-      validator: function(v) {
-        return mongoose.Types.ObjectId.isValid(v);
-      },
-      message: 'Invalid author ID'
-    }
+  language: {
+    type: String,
+    required: true
+  },
+  // Optional fields for future use
+  codeSnippetName: {
+    type: String,
+    default: ''
+  },
+  tags: {
+    type: [String],
+    default: []
   }
 }, {
-  timestamps: true,
-  strict: true,
-  strictQuery: true
+  timestamps: true
 });
 
-reviewSchema.set('toJSON', {
-  virtuals: true,
-  versionKey: false,
-  transform: function(doc, ret) {
-    ret.id = ret._id;
-    delete ret._id;
-    delete ret.__v;
-  }
-});
+// Create indexes for faster queries
+ReviewSchema.index({ user: 1, createdAt: -1 });
+ReviewSchema.index({ language: 1 });
 
-module.exports = mongoose.model('Review', reviewSchema);
+const Review = mongoose.model('Review', ReviewSchema);
+
+module.exports = Review;
