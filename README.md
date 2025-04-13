@@ -108,7 +108,7 @@ This application can be run using Docker containers. Make sure you have Docker a
 1. Clone the repository:
 ```bash
 git clone <repository-url>
-cd code-review-app
+cd code-reviewer
 ```
 
 2. Set up environment variables:
