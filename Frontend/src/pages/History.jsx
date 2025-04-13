@@ -1,74 +1,75 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { reviewService } from '../services/api';
-import { AuthContext } from '../context/AuthContext';
+import Markdown from 'react-markdown';
+import '../styles/History.css';
 
 const History = () => {
-  const { user } = useContext(AuthContext);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedReview, setSelectedReview] = useState(null);
 
   useEffect(() => {
-    console.log("History component mounted, user:", user);
-    if (user && user.token) {
-      console.log("User has token, fetching reviews...");
-      fetchReviews();
-    } else {
-      console.error("No user token available!");
-      setLoading(false);
-      setError('You need to be logged in to view your history');
-    }
-  }, [user]);
+    fetchReviews();
+  }, []);
 
   const fetchReviews = async () => {
     try {
-      console.log("Fetching reviews from API...");
       setLoading(true);
       const response = await reviewService.getReviews();
-      console.log("Reviews data received:", response.data);
-      setReviews(response.data);
-      setError(null);
+      console.log('Reviews data received:', response.data);
+      setReviews(response.data || []);
     } catch (err) {
-      console.error('Error fetching reviews details:', err);
-      if (err.response) {
-        console.error('Status:', err.response.status);
-        console.error('Data:', err.response.data);
-      }
-      setError('Failed to load your review history. ' + (err.message || ''));
+      console.error('Error fetching reviews:', err);
+      setError('Failed to load your review history. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (window.confirm('Are you sure you want to delete this review?')) {
-      try {
-        console.log("Deleting review with ID:", id);
-        await reviewService.deleteReview(id);
-        // Remove the deleted review from state
-        setReviews(reviews.filter(review => review._id !== id));
-        console.log("Review successfully deleted");
-      } catch (err) {
-        console.error('Error deleting review:', err);
-        if (err.response) {
-          console.error('Status:', err.response.status);
-          console.error('Data:', err.response.data);
-        }
-        setError('Failed to delete review. ' + (err.message || ''));
-      }
+  const viewReviewDetails = (review) => {
+    setSelectedReview(review);
+  };
+
+  const closeReviewDetails = () => {
+    setSelectedReview(null);
+  };
+
+  // Format date helper function
+  const formatDate = (dateString) => {
+    if (!dateString) return 'Unknown date';
+    
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return 'Invalid date';
     }
   };
 
-  const formatDate = (dateString) => {
-    const options = { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+  // Get a preview of code (safely)
+  const getCodePreview = (code) => {
+    if (!code) return 'No code available';
+    
+    // Safely get a substring
+    const preview = typeof code === 'string' 
+      ? (code.length > 50 ? code.substring(0, 50) + '...' : code) 
+      : 'Invalid code format';
+      
+    return preview;
+  };
+
+  // Language display helper
+  const getLanguageDisplay = (lang) => {
+    if (!lang) return 'Unknown';
+    return lang.charAt(0).toUpperCase() + lang.slice(1);
   };
 
   return (
@@ -113,44 +114,61 @@ const History = () => {
       {/* Main content */}
       <div className="main-content">
         <div className="history-container">
-          <h2>Your Code Review History</h2>
+          <h2>Your Review History</h2>
           
           {error && <div className="error-message">{error}</div>}
           
           {loading ? (
-            <div className="loading-state">Loading your review history...</div>
+            <div className="loading">Loading your review history...</div>
           ) : reviews.length === 0 ? (
-            <div className="empty-history">
-              <p>You haven't submitted any code for review yet.</p>
-              <Link to="/" className="history-button">Start Your First Review</Link>
+            <div className="empty-state">
+              <p>You don't have any code reviews yet.</p>
+              <Link to="/" className="btn">Create Your First Review</Link>
             </div>
           ) : (
             <div className="reviews-list">
               {reviews.map((review) => (
                 <div key={review._id} className="review-item">
                   <div className="review-header">
-                    <h3>Review from {formatDate(review.createdAt)}</h3>
-                    <div className="review-actions">
-                      <Link to={`/review/${review._id}`} className="view-button">
-                        View
-                      </Link>
-                      <button 
-                        onClick={() => handleDelete(review._id)} 
-                        className="delete-button"
-                      >
-                        Delete
-                      </button>
-                    </div>
+                    <span className="language-tag">{getLanguageDisplay(review.language)}</span>
+                    <span className="date">{formatDate(review.createdAt)}</span>
                   </div>
-                  
-                  <div className="review-details">
-                    <span className="language-tag">{review.language}</span>
-                    <p className="code-snippet">
-                      {review.codeSubmitted.substring(0, 100)}...
-                    </p>
+                  <div className="review-preview">
+                    <pre className="code-preview">{getCodePreview(review.code)}</pre>
                   </div>
+                  <button
+                    onClick={() => viewReviewDetails(review)}
+                    className="view-details-btn"
+                  >
+                    View Details
+                  </button>
                 </div>
               ))}
+            </div>
+          )}
+          
+          {selectedReview && (
+            <div className="review-modal">
+              <div className="review-modal-content">
+                <div className="review-modal-header">
+                  <h3>Code Review Details</h3>
+                  <button onClick={closeReviewDetails} className="close-btn">×</button>
+                </div>
+                <div className="review-modal-body">
+                  <div className="review-details-info">
+                    <span className="language-tag">{getLanguageDisplay(selectedReview.language)}</span>
+                    <span className="date">{formatDate(selectedReview.createdAt)}</span>
+                  </div>
+                  
+                  <h4>Your Code</h4>
+                  <pre className="code-full">{selectedReview.code}</pre>
+                  
+                  <h4>AI Review</h4>
+                  <div className="review-content">
+                    <Markdown>{selectedReview.review}</Markdown>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -159,4 +177,4 @@ const History = () => {
   );
 };
 
-export default History; 
+export default History;
