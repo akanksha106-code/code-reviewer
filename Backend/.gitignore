@@ -1,0 +1,29 @@
+# Environment files - strict rules
+.env
+.env.*
+!.env.example
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory
+coverage/
+
+# MongoDB
+data/
+dump/
+
+# Logs
+logs/
+*.log
+
+# Temp files
+tmp/
+.tmp/

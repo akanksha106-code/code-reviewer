@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { useContext } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from './context/AuthContext';
+import { connectionService } from './services/api';
 import Header from './components/Header';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './pages/Login';
@@ -13,6 +14,23 @@ import './App.css';
 function App() {
   const { loading } = useContext(AuthContext);
   const location = useLocation();
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionError, setConnectionError] = useState(null);
+
+  useEffect(() => {
+    const checkConnection = async () => {
+      try {
+        const connected = await connectionService.validateConnection();
+        setIsConnected(connected);
+        setConnectionError(null);
+      } catch (error) {
+        setIsConnected(false);
+        setConnectionError('Cannot connect to backend service');
+      }
+    };
+
+    checkConnection();
+  }, []);
   
   // Hide header on pages that use the sidebar
   const hideHeaderPaths = ['/', '/dashboard', '/history'];
@@ -20,6 +38,10 @@ function App() {
 
   if (loading) {
     return <div className="loading-app">Loading...</div>;
+  }
+
+  if (connectionError) {
+    return <div className="error-message">Error: {connectionError}</div>;
   }
 
   return (

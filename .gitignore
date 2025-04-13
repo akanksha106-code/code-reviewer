@@ -1,7 +1,47 @@
-# Node.js
-node_modules/
+# Environment files - strict rules
 .env
+.env.*
+!.env.example
+.env.local
+.env.development
+.env.production
+.env.test
+
+# Dependencies
+node_modules/
+.pnpm-store/
+package-lock.json
+yarn.lock
+.yarn-integrity
+
+# Build outputs
 dist/
 build/
+out/
+
+# IDE and editor files
+.idea/
 .vscode/
+*.sublime-project
+*.sublime-workspace
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+mongodb_data/
