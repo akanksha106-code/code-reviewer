@@ -12,12 +12,21 @@ const api = axios.create({
   }
 });
 
+// Get stored token
+const getStoredToken = () => {
+  try {
+    return localStorage.getItem('auth_token');
+  } catch (error) {
+    console.error('Error accessing localStorage:', error);
+    return null;
+  }
+};
+
 // Add request interceptor for authentication
 api.interceptors.request.use(
   (config) => {
-    // Get the token from localStorage
-    const userInfo = JSON.parse(localStorage.getItem('user') || '{}');
-    const token = userInfo.token;
+    // Get the token from localStorage with error handling
+    const token = getStoredToken();
 
     // If token exists, add it to the headers
     if (token) {
@@ -73,7 +82,7 @@ api.interceptors.response.use(
   }
 );
 
-// Auth service
+// Auth service with improved methods
 export const authService = {
   register: async (username, email, password) => {
     try {
@@ -86,34 +95,49 @@ export const authService = {
   
   login: async (email, password) => {
     try {
-      const response = await api.post('/auth/login', { email, password });
-      
-      // Save user info to local storage if login is successful
-      if (response.data) {
-        localStorage.setItem('user', JSON.stringify(response.data));
-      }
-      
-      return response;
+      return await api.post('/auth/login', { email, password });
     } catch (error) {
       console.error('Login error:', error);
       throw error;
     }
   },
   
+  refreshToken: async (token) => {
+    try {
+      return await api.post('/auth/refresh-token', { token });
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      throw error;
+    }
+  },
+  
   logout: () => {
-    localStorage.removeItem('user');
+    try {
+      localStorage.removeItem('auth_token');
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('auth_expiry');
+    } catch (error) {
+      console.error('Error during logout:', error);
+    }
   },
   
   getCurrentUser: () => {
-    return JSON.parse(localStorage.getItem('user'));
+    try {
+      const storedUser = localStorage.getItem('auth_user');
+      return storedUser ? JSON.parse(storedUser) : null;
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      return null;
+    }
   },
   
   isAuthenticated: () => {
-    return !!localStorage.getItem('user');
-  },
-  
-  updateProfile: async (userData) => {
-    return await api.put('/auth/profile', userData);
+    try {
+      return !!localStorage.getItem('auth_token');
+    } catch (error) {
+      console.error('Error checking authentication status:', error);
+      return false;
+    }
   }
 };
 

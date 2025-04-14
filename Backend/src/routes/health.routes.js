@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
+const { protect } = require('../middleware/auth.middleware');
 
 // Basic health check endpoint
 router.get('/', (req, res) => {
@@ -55,6 +56,19 @@ router.get('/services', (req, res) => {
 // Check available
 router.get('/check', (req, res) => {
   res.json({ available: true });
+});
+
+// Add an authenticated health check endpoint
+router.get('/auth-check', protect, (req, res) => {
+  res.json({
+    status: 'authenticated',
+    user: {
+      id: req.user.id,
+      username: req.user.username,
+      email: req.user.email
+    },
+    timestamp: new Date().toISOString()
+  });
 });
 
 module.exports = router;
