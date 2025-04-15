@@ -18,6 +18,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            # Load Node.js
             export NVM_DIR="$HOME/.nvm"
             [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
             nvm install 18
@@ -25,16 +26,24 @@ jobs:
 
             # Backend setup
             cd ~/code-reviewer/Backend
+            # Create .env file from GitHub secrets
+            echo "PORT=${{ secrets.PORT }}" > .env
+            echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" >> .env
+            echo "GEMINI_API_KEY=${{ secrets.GEMINI_KEY }}" >> .env
+            echo "NODE_ENV=${{ secrets.NODE_ENV }}" >> .env
             npm install
-            echo "GEMINI_API_KEY=${{ secrets.GEMINI_KEY }}" > .env
             pm2 stop backend-app || true
             pm2 start server.js --name backend-app --watch
             pm2 save
 
             # Frontend setup
             cd ~/code-reviewer/Frontend
+            # Create .env.production file for React
+            echo "REACT_APP_API_URL=${{ secrets.REACT_APP_API_URL }}" > .env.production
+            echo "REACT_APP_BASE_URL=${{ secrets.REACT_APP_BASE_URL }}" >> .env.production
             npm install
             npm run build
             sudo rm -rf /var/www/html/*
             sudo cp -r dist/* /var/www/html/
             sudo systemctl restart nginx
+
